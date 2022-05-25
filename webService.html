@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web servis raporlama aracı</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous" />
+</head>
+
+<html>
+
+<body>
+  <div class="container">
+    <br>
+    <h2 style="color:gray">Web servis raporlama aracı</h2>
+    <br>
+
+    <h5 style="color:darkblue;">1. adım: Bağlantı bilgilerini girin</h5>
+    <div class="input-group mb-3" style="width: 1200px">
+      <label class="input-group-text" for="urlSelectFromConfig">Listeden kayıtlı bir URL seçin</label>
+      <select class="form-select" id="urlSelectFromConfig"
+        title="Yeni girişleri bu dosyada düzenleyebilirsiniz: C:\Users\[userName]\AppData\Roaming\electron-store-nodejs\Config\Config.json"
+        onchange="fillValues()">
+      </select>
+      <button class="btn btn-outline-secondary" type="button" id="btnOpenConfig">Yeni URL Kaydedin</button>
+    </div>
+
+    <div class="input-group mb-3" style="width: 1200px">
+      <label class="input-group-text" for="manualURL">ya da yeni bir URL girin</label>
+        <input id="manualURL" type="text" aria-label="URL" placeholder="URL" class="form-control">
+    </div>
+
+    <div class="input-group mb-3" style="width: 1200px">
+      <label class="input-group-text" for="manualPass">decoded şifre metni</label>
+      <input id="manualPass" type="text" aria-label="password" placeholder="HTTP Basic Authentication" class="form-control">
+      <label class="input-group-text" for="manualPass">ya da kullanıcı ve şifre girin</label>
+      <input id="manualUser2" type="text" aria-label="user" placeholder="kullanıcı" class="form-control">
+      <input id="manualPass2" type="text" aria-label="password" placeholder="şifre" class="form-control">
+    </div>
+
+
+    <br>
+    <br>
+    <div class="form-floating">
+      <h5 style="color:darkblue;">2. adım: JSON bilgilerini buraya yapıştırın ve gönderin</h5>
+    </div>
+    <textarea class="form-control" placeholder="JSON bilgilerini buraya yapıştırın" id="jsonInput"
+      style="height: 200px; width: 1200px; font-size: 10pt">[]</textarea>
+    <br>
+    <div>
+      <button type="button" class="btn btn-primary" onclick="postSelected()">Gönder</button>
+    </div>
+    <br>
+    <br>
+    <div class="form-floating">
+      <h5 style="color:darkblue;">3. adım: Web servis cevaplarını burada görün</h5>
+      <textarea class="form-control" placeholder="Web servis cevapları burada görünecek" id="jsonResult"
+        style="height: 100px; width: 1200px; font-size: 10pt"></textarea>
+    </div>
+    <br>
+    <div>
+      <button type="button" class="btn btn-outline-info btn-sm" onclick="evdsTest()" style="float: right;">EVDS test
+        verisi al</button>
+    </div>
+  </div>
+
+
+  <script>
+    const ipcRenderer = require('electron').ipcRenderer;
+    document.addEventListener("DOMContentLoaded", () => {
+      fillSelectWithConfigFile("urlSelectFromConfig")
+    });
+
+    function fillValues() {
+      let myArray
+      myReportType = document.getElementById("urlSelectFromConfig").value
+      myArray = myReportType.split("URI:");
+      document.getElementById("manualURL").value = myArray[1]
+    }
+    function postSelected() {
+      var value = document.getElementById('manualPass').value;
+      var value2 = document.getElementById('manualPass2').value;
+
+      if (value.length == 0) {
+        if(value2.length == 0){
+          alert("şifre bilgileri girilmelidir.")
+        }
+        else{
+          alert("kullanıcı ve şifre ile devam ediliyor.")
+          postManualRequest2(document.getElementById("manualURL").value, document.getElementById("manualUser2").value, document.getElementById("manualPass2").value)
+        }
+        
+      }
+      else {
+        alert("decode edilmiş şifre metni ile devam ediliyor.")
+        postManualRequest(document.getElementById("manualURL").value, document.getElementById("manualPass").value)
+      }
+    }
+
+    function postManualRequest(url, pass) {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        document.getElementById("jsonResult").innerHTML = "response:" + xhttp.responseText + "   status:" + xhttp.statusText;
+      };
+      xhttp.open("POST", url, true);
+      xhttp.setRequestHeader("Authorization", "Basic " + pass)
+      xhttp.setRequestHeader("Content-Type", "application/json")
+      var jsonText = document.getElementById("jsonInput").value
+      xhttp.send(jsonText)
+    }
+
+    function postManualRequest2(url, user, pass) {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        document.getElementById("jsonResult").innerHTML = "response:" + xhttp.responseText + "   status:" + xhttp.statusText;
+      };
+      xhttp.open("POST", url, true);
+      xhttp.setRequestHeader("Authorization", "Basic " + b64EncodeUnicode(user + ":" + pass))
+      xhttp.setRequestHeader("Content-Type", "application/json")
+      var jsonText = document.getElementById("jsonInput").value
+      xhttp.send(jsonText)
+    }
+
+
+    function b64EncodeUnicode(str) {
+      return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1) {
+        return String.fromCharCode('0x' + p1);
+        //  console.log("String.fromCharCode('0x' + p1);" + String.fromCharCode('0x' + p1))
+      }));
+    }
+
+    function fillSelectWithConfigFile(selectId) {
+      const Store = require('electron-store');
+      const store = new Store();
+      store.set('listOfUrl', ["your first entry URI:https://enter.your.address.here", "your second entry URI:https://enter.your.second.address.here"]);
+      
+      var dropdown = document.getElementById(selectId);
+      dropdown.options.length = 0;
+      var searchResults = store.get('listOfUrl');
+      for (var i = 0; i < searchResults.length; ++i) {
+        dropdown[dropdown.length] = new Option(searchResults[i], searchResults[i]);
+      }
+      fillValues()
+    }
+
+
+    const btnclick = document.getElementById('btnOpenConfig');
+    btnclick.addEventListener('click', function () {
+      ipcRenderer.send("openConfig"); // ipcRender.send will pass the information to main process
+    });
+
+    function evdsTest() {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        document.getElementById("jsonResult").innerHTML = "response:" + xhttp.responseText + "   status:" + xhttp.statusText;
+      };
+      xhttp.open("GET", "https://evds2.tcmb.gov.tr/service/evds/series=TP.DK.USD.S.YTL&startDate=01-01-2005&endDate=01-02-2017&type=xml&key=Mx0qc0p6Jm&aggregationTypes=avg&formulas=1&frequency=8", true);
+      xhttp.send();
+    }
+
+  </script>
+</body>
+
+</html>
